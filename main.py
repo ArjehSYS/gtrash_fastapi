@@ -6,7 +6,7 @@ import bcrypt
 app = FastAPI()
 
 DB = {
-    "host": "dpg-d0mr31m3jp1c738jr810-a",
+    "host": "dpg-d0mr31m3jp1c738jr810-a.oregon-postgres.render.com",
     "port": 5432,
     "user": "gtrash_user",
     "password": "eRamXO4QuE5SXVhcQsEX62xIIaHEHZWZ",
