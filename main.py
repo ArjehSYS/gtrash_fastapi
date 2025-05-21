@@ -6,11 +6,11 @@ import bcrypt
 app = FastAPI()
 
 DB = {
-    "host": "trolley.proxy.rlwy.net",
-    "port": 22193,
-    "user": "postgres",
-    "password": "GOCwYwbbadFCQRsXbDBXOWDIsnvoNUqo",
-    "dbname": "railway"
+    "host": "dpg-d0mr31m3jp1c738jr810-a",
+    "port": 5432,
+    "user": "gtrash_user",
+    "password": "eRamXO4QuE5SXVhcQsEX62xIIaHEHZWZ",
+    "dbname": "gtrash"
 }
 
 def get_conn():
