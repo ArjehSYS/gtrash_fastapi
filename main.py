@@ -37,6 +37,8 @@ class ReportRequest(BaseModel):
     location: str
     description: str
     email: str
+    original_level: str = None
+    reported_level: str = None
 
 @app.post("/register")
 def register(req: RegisterRequest):
@@ -80,10 +82,10 @@ def create_report(req: ReportRequest):
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
     user_id = user[0]
-    # Insert report
+    # Insert report with original_level and reported_level
     cur.execute(
-        "INSERT INTO garbage_reports (location, description, reporter_id) VALUES (%s, %s, %s)",
-        (req.location, req.description, user_id)
+        "INSERT INTO garbage_reports (location, description, reporter_id, original_level, reported_level) VALUES (%s, %s, %s, %s, %s)",
+        (req.location, req.description, user_id, req.original_level, req.reported_level)
     )
     conn.commit()
     conn.close()
