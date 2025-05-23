@@ -57,6 +57,8 @@ class GroupRequest(BaseModel):
     truck_id: Optional[int] = None
     personnel_id: Optional[int] = None
 
+# --- DRIVER LOCATION ENDPOINT ---
+
 class DriverLocationRequest(BaseModel):
     email: str
     latitude: float
@@ -82,6 +84,33 @@ def driver_location(req: DriverLocationRequest):
     conn.commit()
     conn.close()
     return {"success": True, "message": "Location updated"}
+
+
+class DriverLocationRequest(BaseModel):
+    email: str
+    latitude: float
+    longitude: float
+
+@app.get("/driver_locations")
+def get_driver_locations():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT u.name, u.email, dl.latitude, dl.longitude
+        FROM driver_locations dl
+        JOIN users u ON dl.user_id = u.id
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return [
+        {
+            "name": r[0],
+            "email": r[1],
+            "latitude": r[2],
+            "longitude": r[3],
+        }
+        for r in rows
+    ]
 
 @app.post("/register")
 def register(req: RegisterRequest):
