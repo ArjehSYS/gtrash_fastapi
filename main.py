@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import psycopg2
 import bcrypt
 
@@ -46,8 +47,15 @@ class ReportRequest(BaseModel):
     location: str
     description: str
     email: str
-    original_level: str = None
-    reported_level: str = None
+    original_level: Optional[str] = None
+    reported_level: Optional[str] = None
+
+class GroupRequest(BaseModel):
+    name: str
+    status: str  # e.g. 'idle', 'on_road', 'collecting'
+    area: str
+    truck_id: Optional[int] = None
+    personnel_id: Optional[int] = None
 
 @app.post("/register")
 def register(req: RegisterRequest):
@@ -146,6 +154,19 @@ def get_groups():
         }
         for r in rows
     ]
+
+@app.post("/groups")
+def create_group(req: GroupRequest):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO collection_groups (name, status, area, truck_id, personnel_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (req.name, req.status, req.area, req.truck_id, req.personnel_id)
+    )
+    group_id = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return {"success": True, "group_id": group_id}
 
 @app.get("/trucks")
 def get_trucks():
