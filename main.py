@@ -57,6 +57,33 @@ class GroupRequest(BaseModel):
     truck_id: Optional[int] = None
     personnel_id: Optional[int] = None
 
+# --- DRIVER LOCATION ENDPOINT ---
+class DriverLocationRequest(BaseModel):
+    email: str
+    latitude: float
+    longitude: float
+
+@app.post("/driver_location")
+def driver_location(req: DriverLocationRequest):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE email = %s", (req.email,))
+    user = cur.fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    user_id = user[0]
+    # Insert or update the driver's location
+    cur.execute("""
+        INSERT INTO driver_locations (user_id, latitude, longitude)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (user_id) DO UPDATE
+        SET latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude
+    """, (user_id, req.latitude, req.longitude))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "Location updated"}
+
 @app.post("/register")
 def register(req: RegisterRequest):
     conn = get_conn()
