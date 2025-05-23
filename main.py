@@ -1,9 +1,20 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # <-- Add this
 from pydantic import BaseModel
 import psycopg2
 import bcrypt
 
 app = FastAPI()
+
+# --- Add CORS middleware here ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can restrict this to your web app's URL for more security
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# --- End CORS middleware ---
 
 DB = {
     "host": "dpg-d0mr31m3jp1c738jr810-a",
