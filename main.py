@@ -9,7 +9,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For production, restrict to your web app's URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,7 +55,7 @@ class GroupRequest(BaseModel):
     status: str  # e.g. 'idle', 'on_road', 'collecting'
     area: str
     truck_id: Optional[int] = None
-    personnel_id: Optional[int] = None
+    # personnel_id REMOVED
 
 class GroupMemberRequest(BaseModel):
     group_id: int
@@ -229,8 +229,8 @@ def create_group(req: GroupRequest):
     cur = conn.cursor()
     try:
         cur.execute(
-            "INSERT INTO collection_groups (name, status, area, truck_id, personnel_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (req.name, req.status, req.area, req.truck_id, req.personnel_id)
+            "INSERT INTO collection_groups (name, status, area, truck_id) VALUES (%s, %s, %s, %s) RETURNING id",
+            (req.name, req.status, req.area, req.truck_id)
         )
         group_id = cur.fetchone()[0]
         conn.commit()
