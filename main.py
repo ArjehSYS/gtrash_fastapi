@@ -55,7 +55,6 @@ class GroupRequest(BaseModel):
     status: str  # e.g. 'idle', 'on_road', 'collecting'
     area: str
     truck_id: Optional[int] = None
-    # personnel_id REMOVED
 
 class GroupMemberRequest(BaseModel):
     group_id: int
@@ -189,39 +188,44 @@ def get_reports():
 def get_groups():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT g.id, g.name, g.status, g.area, t.plate_number
-        FROM collection_groups g
-        LEFT JOIN trucks t ON g.truck_id = t.id
-        ORDER BY g.id
-    """)
-    groups = cur.fetchall()
-    group_ids = [g[0] for g in groups]
-    if not group_ids:
+    try:
+        cur.execute("""
+            SELECT g.id, g.name, g.status, g.area, t.plate_number
+            FROM collection_groups g
+            LEFT JOIN trucks t ON g.truck_id = t.id
+            ORDER BY g.id
+        """)
+        groups = cur.fetchall()
+        group_ids = [g[0] for g in groups]
+        if not group_ids:
+            return []
+        # psycopg2 requires a tuple for ANY(%s)
+        cur.execute("""
+            SELECT gm.group_id, u.name, gm.role
+            FROM group_members gm
+            JOIN users u ON gm.user_id = u.id
+            WHERE gm.group_id = ANY(%s)
+        """, (group_ids,))
+        members = cur.fetchall()
+        group_members_map = {}
+        for gid, uname, role in members:
+            group_members_map.setdefault(gid, []).append({'name': uname, 'role': role})
+        return [
+            {
+                "id": g[0],
+                "name": g[1],
+                "status": g[2],
+                "area": g[3],
+                "truck": g[4],
+                "members": group_members_map.get(g[0], [])
+            }
+            for g in groups
+        ]
+    except Exception as e:
+        print("Error in get_groups:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         conn.close()
-        return []
-    cur.execute("""
-        SELECT gm.group_id, u.name, gm.role
-        FROM group_members gm
-        JOIN users u ON gm.user_id = u.id
-        WHERE gm.group_id = ANY(%s)
-    """, (group_ids,))
-    members = cur.fetchall()
-    conn.close()
-    group_members_map = {}
-    for gid, uname, role in members:
-        group_members_map.setdefault(gid, []).append({'name': uname, 'role': role})
-    return [
-        {
-            "id": g[0],
-            "name": g[1],
-            "status": g[2],
-            "area": g[3],
-            "truck": g[4],
-            "members": group_members_map.get(g[0], [])
-        }
-        for g in groups
-    ]
 
 @app.post("/groups")
 def create_group(req: GroupRequest):
