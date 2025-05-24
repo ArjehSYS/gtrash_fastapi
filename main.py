@@ -67,6 +67,11 @@ class DriverLocationRequest(BaseModel):
     latitude: float
     longitude: float
 
+class TruckRequest(BaseModel):
+    plate_number: str
+    model: str
+    status: str
+
 @app.post("/driver_location")
 def driver_location(req: DriverLocationRequest):
     conn = get_conn()
@@ -192,7 +197,6 @@ def get_groups():
     """)
     groups = cur.fetchall()
     group_ids = [g[0] for g in groups]
-    # Fix: If there are no groups, return an empty list immediately
     if not group_ids:
         conn.close()
         return []
@@ -260,6 +264,24 @@ def get_trucks():
         }
         for r in rows
     ]
+
+@app.post("/trucks")
+def add_truck(req: TruckRequest):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO trucks (plate_number, model, status) VALUES (%s, %s, %s) RETURNING id",
+            (req.plate_number, req.model, req.status)
+        )
+        truck_id = cur.fetchone()[0]
+        conn.commit()
+        return {"success": True, "truck_id": truck_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
 
 @app.get("/users")
 def get_users():
