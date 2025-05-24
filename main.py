@@ -57,7 +57,10 @@ class GroupRequest(BaseModel):
     truck_id: Optional[int] = None
     personnel_id: Optional[int] = None
 
-# --- DRIVER LOCATION ENDPOINT ---
+class GroupMemberRequest(BaseModel):
+    group_id: int
+    user_id: int
+    role: str  # 'driver' or 'collector'
 
 class DriverLocationRequest(BaseModel):
     email: str
@@ -74,7 +77,6 @@ def driver_location(req: DriverLocationRequest):
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
     user_id = user[0]
-    # Insert or update the driver's location
     cur.execute("""
         INSERT INTO driver_locations (user_id, latitude, longitude)
         VALUES (%s, %s, %s)
@@ -84,12 +86,6 @@ def driver_location(req: DriverLocationRequest):
     conn.commit()
     conn.close()
     return {"success": True, "message": "Location updated"}
-
-
-class DriverLocationRequest(BaseModel):
-    email: str
-    latitude: float
-    longitude: float
 
 @app.get("/driver_locations")
 def get_driver_locations():
@@ -161,8 +157,6 @@ def create_report(req: ReportRequest):
     conn.close()
     return {"success": True, "message": "Report submitted"}
 
-# --- LGU Dashboard Endpoints ---
-
 @app.get("/reports")
 def get_reports():
     conn = get_conn()
@@ -191,23 +185,35 @@ def get_groups():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT g.name, g.status, g.area, t.plate_number, p.name
+        SELECT g.id, g.name, g.status, g.area, t.plate_number
         FROM collection_groups g
         LEFT JOIN trucks t ON g.truck_id = t.id
-        LEFT JOIN personnel p ON g.personnel_id = p.id
         ORDER BY g.id
     """)
-    rows = cur.fetchall()
+    groups = cur.fetchall()
+    # Get group members for each group
+    group_ids = [g[0] for g in groups]
+    cur.execute("""
+        SELECT gm.group_id, u.name, gm.role
+        FROM group_members gm
+        JOIN users u ON gm.user_id = u.id
+        WHERE gm.group_id = ANY(%s)
+    """, (group_ids,))
+    members = cur.fetchall()
     conn.close()
+    group_members_map = {}
+    for gid, uname, role in members:
+        group_members_map.setdefault(gid, []).append({'name': uname, 'role': role})
     return [
         {
-            "name": r[0],
-            "status": r[1],  # idle, on_road, collecting
-            "area": r[2],
-            "truck": r[3],
-            "personnel": r[4],
+            "id": g[0],
+            "name": g[1],
+            "status": g[2],
+            "area": g[3],
+            "truck": g[4],
+            "members": group_members_map.get(g[0], [])
         }
-        for r in rows
+        for g in groups
     ]
 
 @app.post("/groups")
@@ -223,6 +229,18 @@ def create_group(req: GroupRequest):
     conn.close()
     return {"success": True, "group_id": group_id}
 
+@app.post("/group_members")
+def add_group_member(req: GroupMemberRequest):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO group_members (group_id, user_id, role) VALUES (%s, %s, %s)",
+        (req.group_id, req.user_id, req.role)
+    )
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
 @app.get("/trucks")
 def get_trucks():
     conn = get_conn()
@@ -236,23 +254,6 @@ def get_trucks():
             "plate_number": r[1],
             "model": r[2],
             "status": r[3],
-        }
-        for r in rows
-    ]
-
-@app.get("/personnel")
-def get_personnel():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, role, contact_number FROM personnel ORDER BY id")
-    rows = cur.fetchall()
-    conn.close()
-    return [
-        {
-            "id": r[0],
-            "name": r[1],
-            "role": r[2],
-            "contact": r[3],
         }
         for r in rows
     ]
