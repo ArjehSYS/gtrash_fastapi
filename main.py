@@ -191,8 +191,11 @@ def get_groups():
         ORDER BY g.id
     """)
     groups = cur.fetchall()
-    # Get group members for each group
     group_ids = [g[0] for g in groups]
+    # Fix: If there are no groups, return an empty list immediately
+    if not group_ids:
+        conn.close()
+        return []
     cur.execute("""
         SELECT gm.group_id, u.name, gm.role
         FROM group_members gm
