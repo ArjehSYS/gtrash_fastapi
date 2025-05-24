@@ -227,26 +227,36 @@ def get_groups():
 def create_group(req: GroupRequest):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO collection_groups (name, status, area, truck_id, personnel_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-        (req.name, req.status, req.area, req.truck_id, req.personnel_id)
-    )
-    group_id = cur.fetchone()[0]
-    conn.commit()
-    conn.close()
-    return {"success": True, "group_id": group_id}
+    try:
+        cur.execute(
+            "INSERT INTO collection_groups (name, status, area, truck_id, personnel_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (req.name, req.status, req.area, req.truck_id, req.personnel_id)
+        )
+        group_id = cur.fetchone()[0]
+        conn.commit()
+        return {"success": True, "group_id": group_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
 
 @app.post("/group_members")
 def add_group_member(req: GroupMemberRequest):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO group_members (group_id, user_id, role) VALUES (%s, %s, %s)",
-        (req.group_id, req.user_id, req.role)
-    )
-    conn.commit()
-    conn.close()
-    return {"success": True}
+    try:
+        cur.execute(
+            "INSERT INTO group_members (group_id, user_id, role) VALUES (%s, %s, %s)",
+            (req.group_id, req.user_id, req.role)
+        )
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
 
 @app.get("/trucks")
 def get_trucks():
