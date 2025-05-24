@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -166,7 +166,7 @@ def get_reports():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT gr.location, gr.description, u.email, gr.original_level, gr.reported_level
+        SELECT gr.id, gr.location, gr.description, u.email, gr.original_level, gr.reported_level
         FROM garbage_reports gr
         JOIN users u ON gr.reporter_id = u.id
         ORDER BY gr.id DESC
@@ -175,14 +175,43 @@ def get_reports():
     conn.close()
     return [
         {
-            "location": r[0],
-            "description": r[1],
-            "email": r[2],
-            "original_level": r[3],
-            "reported_level": r[4],
+            "id": r[0],
+            "location": r[1],
+            "description": r[2],
+            "email": r[3],
+            "original_level": r[4],
+            "reported_level": r[5],
         }
         for r in rows
     ]
+
+@app.delete("/reports/{report_id}")
+def delete_report(report_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM garbage_reports WHERE id = %s", (report_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.patch("/reports/{report_id}")
+def update_report(report_id: int, data: dict = Body(...)):
+    conn = get_conn()
+    cur = conn.cursor()
+    fields = []
+    values = []
+    for key in ['description', 'reported_level']:
+        if key in data:
+            fields.append(f"{key} = %s")
+            values.append(data[key])
+    if not fields:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No fields to update")
+    values.append(report_id)
+    cur.execute(f"UPDATE garbage_reports SET {', '.join(fields)} WHERE id = %s", tuple(values))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @app.get("/groups")
 def get_groups():
@@ -199,7 +228,6 @@ def get_groups():
         group_ids = [g[0] for g in groups]
         if not group_ids:
             return []
-        # psycopg2 requires a tuple for ANY(%s)
         cur.execute("""
             SELECT gm.group_id, u.name, gm.role
             FROM group_members gm
@@ -244,6 +272,34 @@ def create_group(req: GroupRequest):
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         conn.close()
+
+@app.delete("/groups/{group_id}")
+def delete_group(group_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM collection_groups WHERE id = %s", (group_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.patch("/groups/{group_id}")
+def update_group(group_id: int, data: dict = Body(...)):
+    conn = get_conn()
+    cur = conn.cursor()
+    fields = []
+    values = []
+    for key in ['name', 'status', 'area']:
+        if key in data:
+            fields.append(f"{key} = %s")
+            values.append(data[key])
+    if not fields:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No fields to update")
+    values.append(group_id)
+    cur.execute(f"UPDATE collection_groups SET {', '.join(fields)} WHERE id = %s", tuple(values))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @app.post("/group_members")
 def add_group_member(req: GroupMemberRequest):
@@ -297,6 +353,34 @@ def add_truck(req: TruckRequest):
     finally:
         conn.close()
 
+@app.delete("/trucks/{truck_id}")
+def delete_truck(truck_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM trucks WHERE id = %s", (truck_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.patch("/trucks/{truck_id}")
+def update_truck(truck_id: int, data: dict = Body(...)):
+    conn = get_conn()
+    cur = conn.cursor()
+    fields = []
+    values = []
+    for key in ['model', 'status']:
+        if key in data:
+            fields.append(f"{key} = %s")
+            values.append(data[key])
+    if not fields:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No fields to update")
+    values.append(truck_id)
+    cur.execute(f"UPDATE trucks SET {', '.join(fields)} WHERE id = %s", tuple(values))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
 @app.get("/users")
 def get_users():
     conn = get_conn()
@@ -314,3 +398,31 @@ def get_users():
         }
         for r in rows
     ]
+
+@app.delete("/users/{user_id}")
+def delete_user(user_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.patch("/users/{user_id}")
+def update_user(user_id: int, data: dict = Body(...)):
+    conn = get_conn()
+    cur = conn.cursor()
+    fields = []
+    values = []
+    for key in ['name', 'contact']:
+        if key in data:
+            fields.append(f"{'contact_number' if key == 'contact' else key} = %s")
+            values.append(data[key])
+    if not fields:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No fields to update")
+    values.append(user_id)
+    cur.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = %s", tuple(values))
+    conn.commit()
+    conn.close()
+    return {"success": True}
