@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import psycopg2
 import bcrypt
 
@@ -70,6 +70,54 @@ class TruckRequest(BaseModel):
     plate_number: str
     model: str
     status: str
+
+# --- Location Models and Endpoints ---
+
+class Location(BaseModel):
+    id: int
+    name: str
+    latitude: float
+    longitude: float
+    level: str
+
+class LocationCreate(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+    level: str
+
+@app.get("/locations", response_model=List[Location])
+def get_locations():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, latitude, longitude, level FROM locations ORDER BY id")
+    rows = cur.fetchall()
+    conn.close()
+    return [
+        Location(
+            id=r[0],
+            name=r[1],
+            latitude=r[2],
+            longitude=r[3],
+            level=r[4]
+        )
+        for r in rows
+    ]
+
+@app.post("/locations", response_model=Location)
+def add_location(loc: LocationCreate):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO locations (name, latitude, longitude, level) VALUES (%s, %s, %s, %s) RETURNING id",
+        (loc.name, loc.latitude, loc.longitude, loc.level)
+    )
+    loc_id = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return Location(id=loc_id, **loc.dict())
+
+# --- Existing Endpoints ---
 
 @app.post("/driver_location")
 def driver_location(req: DriverLocationRequest):
